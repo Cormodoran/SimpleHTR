@@ -1,15 +1,17 @@
 import argparse
-import json
-from typing import Tuple, List
 import glob
-import cv2
-import numpy as np
-import editdistance
-from path import Path
+import json
 import os
+import pathlib
+from typing import List, Tuple
 
-from dataloader_iam import DataLoaderIAM, Batch
-from model import Model, DecoderType
+import editdistance
+import numpy as np
+from path import Path
+from PIL import Image
+
+from dataloader_iam import Batch, DataLoaderIAM
+from model import DecoderType, Model
 from preprocessor import Preprocessor
 
 
@@ -143,8 +145,9 @@ def infer(model: Model, fn_img: Path) -> None:
         preprocessor = Preprocessor(get_img_size(), dynamic_width=True, padding=16)
         img = preprocessor.process_img(im)
         batch = Batch([img], None, 1)
-        recognized, probability = model.infer_batch(batch, True)
-        with open('results.txt', 'w') as f:
+        recognized, _ = model.infer_batch(batch, True)
+
+        with open("../result.txt", 'a') as f:
             f.write(basename + '\n')
             f.write(recognized[0] + '\n' + '\n')
 
@@ -154,6 +157,7 @@ def parse_args() -> argparse.Namespace:
     """Parses arguments from the command line."""
     parser = argparse.ArgumentParser()
 
+    parser.add_argument('--input-dir', help="input directory", default="input")
     parser.add_argument('--mode', choices=['train', 'validate', 'infer'], default='infer')
     parser.add_argument('--decoder', choices=['bestpath', 'beamsearch'], default='beamsearch')
     parser.add_argument('--batch_size', help='Batch size.', type=int, default=10) #default=100
@@ -202,7 +206,7 @@ def main():
     # infer text on test image
     elif args.mode == 'infer':
         model = Model(char_list_from_file(), decoder_type, must_restore=True, dump=args.dump)
-        infer(model, args.img_file)
+        infer(model, args.data_dir)
 
 
 if __name__ == '__main__':
