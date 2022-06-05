@@ -17,14 +17,6 @@ The model takes **images of text lines (multiple words) as input** and **outputs
 
 The input images, and the expected outputs are shown below when the text line model is used.
 
-![test](./data/word.png)
-```
-> python main.py
-Init with stored values from ../model/snapshot-13
-Recognized: "word"
-Probability: 0.9806370139122009
-```
-
 ![test](./data/line.png)
 
 ```
