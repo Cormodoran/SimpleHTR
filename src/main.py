@@ -133,7 +133,7 @@ def infer(model: Model, fn_img: Path) -> None:
     """Recognizes text in image provided by file path."""
     
     print("Image processing start")
-    for file in glob.glob("C:/Users/andre/Desktop/hwrt3/IAM-data/IAM-data/img/*.png"):
+    for file in glob.glob(fn_img + "/*.png"):
         basename = os.path.basename(file)
         # print(basename)
         im = Image.open(file)
