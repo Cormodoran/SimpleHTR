@@ -146,7 +146,6 @@ def infer(model: Model, fn_img: Path) -> None:
         with open('results.txt', 'w') as f:
             f.write(basename + '\n')
             f.write(recognized[0] + '\n' + '\n')
-    image_list = np.array(image_list).tolist()
 
     preprocessor = Preprocessor(get_img_size(), dynamic_width=True, padding=16)
     img = preprocessor.process_img(img)
