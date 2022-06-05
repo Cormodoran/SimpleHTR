@@ -13,17 +13,15 @@ The model takes **images of text lines (multiple words) as input** and **outputs
 
 * Run inference code:
   * Execute `python main.py` to run the model on an image of a word
-  * Execute `python main.py --data_dir '../data' to run the model on images of sentences
+  * Execute `python main.py --data_dir `../data` to run the model on images of sentences
 
 The input images, and the expected outputs are shown below when the text line model is used.
 
 ![test](./data/line.png)
 
 ```
-> python main.py --img_file ../data/line.png
+> python main.py --data_dir ../data
 Init with stored values from ../model/snapshot-13
-Recognized: "or work on line level"
-Probability: 0.6674373149871826
 ```
 
 ## Command line arguments
