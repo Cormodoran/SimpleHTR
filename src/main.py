@@ -6,6 +6,7 @@ import cv2
 import numpy as np
 import editdistance
 from path import Path
+import os
 
 from dataloader_iam import DataLoaderIAM, Batch
 from model import Model, DecoderType
