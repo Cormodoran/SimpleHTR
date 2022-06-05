@@ -37,32 +37,13 @@ Init with stored values from ../model/snapshot-13
 
 * Delete files from `model` directory if you want to train from scratch
 * Go to the `src` directory and execute `python main.py --mode train --data_dir path/to/IAM`
-* The IAM dataset is split into 95% training data and 5% validation data  
-* If the option `--line_mode` is specified, 
-  the model is trained on text line images created by combining multiple word images into one  
+* The IAM dataset is split into 80% training data and 20% validation data  
 * Training stops after a fixed number of epochs without improvement
 
 The pretrained word model was trained with this command on a GTX 1050 Ti:
 ```
-python main.py --mode train --fast --data_dir path/to/iam  --batch_size 500 --early_stopping 15
+python main.py --mode train --data_dir path/to/iam  --batch_size 250 --early_stopping 15
 ```
-
-And the line model with:
-```
-python main.py --mode train --fast --data_dir path/to/iam  --batch_size 250 --early_stopping 10
-```
-
-
-### Fast image loading
-Loading and decoding the png image files from the disk is the bottleneck even when using only a small GPU.
-The database LMDB is used to speed up image loading:
-* Go to the `src` directory and run `create_lmdb.py --data_dir path/to/iam` with the IAM data directory specified
-* A subfolder `lmdb` is created in the IAM data directory containing the LMDB files
-* When training the model, add the command line option `--fast`
-
-The dataset should be located on an SSD drive.
-Using the `--fast` option and a GTX 1050 Ti training on single words takes around 3h with a batch size of 500.
-Training on text lines takes a bit longer.
 
 
 ## Information about model
