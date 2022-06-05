@@ -2,13 +2,13 @@ import pickle
 import random
 from collections import namedtuple
 from typing import Tuple
+from matplotlib import pyplot as plt
 
-import cv2
-import lmdb
 import numpy as np
 from path import Path
+import pickle
 
-Sample = namedtuple('Sample', 'gt_text, file_path')
+Sample = namedtuple('Sample', 'imgs, gt_text')
 Batch = namedtuple('Batch', 'imgs, gt_texts, batch_size')
 
 
@@ -21,58 +21,37 @@ class DataLoaderIAM:
     def __init__(self,
                  data_dir: Path,
                  batch_size: int,
-                 data_split: float = 0.95,
-                 fast: bool = True) -> None:
+                 data_split: float = 0.8) -> None:
         """Loader for dataset."""
 
         assert data_dir.exists()
-
-        self.fast = fast
-        if fast:
-            self.env = lmdb.open(str(data_dir / 'lmdb'), readonly=True)
 
         self.data_augmentation = False
         self.curr_idx = 0
         self.batch_size = batch_size
         self.samples = []
 
-        f = open(data_dir / 'gt/words.txt')
-        chars = set()
-        bad_samples_reference = ['a01-117-05-02', 'r06-022-03-05']  # known broken images in IAM dataset
-        for line in f:
-            # ignore comment line
-            if not line or line[0] == '#':
-                continue
+        sentences_to_read = open(data_dir / "sentences.pickle", "rb")
+        self.sentences = pickle.load(sentences_to_read)
+        sentences_to_read.close()
 
-            line_split = line.strip().split(' ')
-            assert len(line_split) >= 9
+        images_to_read = open(data_dir / "images.pickle", "rb")
+        self.images = pickle.load(images_to_read)
+        images_to_read.close()
+        
+        flat_list = [item for sublist in self.sentences for item in sublist]
+        flat_list = ''.join(flat_list)
+        chars = set(flat_list)
 
-            # filename: part1-part2-part3 --> part1/part1-part2/part1-part2-part3.png
-            file_name_split = line_split[0].split('-')
-            file_name_subdir1 = file_name_split[0]
-            file_name_subdir2 = f'{file_name_split[0]}-{file_name_split[1]}'
-            file_base_name = line_split[0] + '.png'
-            file_name = data_dir / 'img' / file_name_subdir1 / file_name_subdir2 / file_base_name
+        for i in range(len(self.sentences)):
+            self.samples.append(Sample(self.images[i], self.sentences[i]))
 
-            if line_split[0] in bad_samples_reference:
-                print('Ignoring known broken image:', file_name)
-                continue
-
-            # GT text are columns starting at 9
-            gt_text = ' '.join(line_split[8:])
-            chars = chars.union(set(list(gt_text)))
-
-            # put sample into list
-            self.samples.append(Sample(gt_text, file_name))
 
         # split into training and validation set: 95% - 5%
         split_idx = int(data_split * len(self.samples))
         self.train_samples = self.samples[:split_idx]
         self.validation_samples = self.samples[split_idx:]
 
-        # put words into lists
-        self.train_words = [x.gt_text for x in self.train_samples]
-        self.validation_words = [x.gt_text for x in self.validation_samples]
 
         # start with train set
         self.train_set()
@@ -82,9 +61,8 @@ class DataLoaderIAM:
 
     def train_set(self) -> None:
         """Switch to randomly chosen subset of training set."""
-        self.data_augmentation = True
+        self.data_augmentation = False
         self.curr_idx = 0
-        random.shuffle(self.train_samples)
         self.samples = self.train_samples
         self.curr_set = 'train'
 
@@ -107,27 +85,19 @@ class DataLoaderIAM:
     def has_next(self) -> bool:
         """Is there a next element?"""
         if self.curr_set == 'train':
+            print(self.curr_idx, self.batch_size, len(self.samples))
             return self.curr_idx + self.batch_size <= len(self.samples)  # train set: only full-sized batches
         else:
             return self.curr_idx < len(self.samples)  # val set: allow last batch to be smaller
 
-    def _get_img(self, i: int) -> np.ndarray:
-        if self.fast:
-            with self.env.begin() as txn:
-                basename = Path(self.samples[i].file_path).basename()
-                data = txn.get(basename.encode("ascii"))
-                img = pickle.loads(data)
-        else:
-            img = cv2.imread(self.samples[i].file_path, cv2.IMREAD_GRAYSCALE)
-
-        return img
 
     def get_next(self) -> Batch:
         """Get next element."""
         batch_range = range(self.curr_idx, min(self.curr_idx + self.batch_size, len(self.samples)))
 
-        imgs = [self._get_img(i) for i in batch_range]
-        gt_texts = [self.samples[i].gt_text for i in batch_range]
+        imgs = [self.samples[i][0] for i in batch_range]
+        gt_texts = [self.samples[i][1] for i in batch_range]
+
 
         self.curr_idx += self.batch_size
         return Batch(imgs, gt_texts, len(imgs))

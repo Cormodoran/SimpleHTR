@@ -15,7 +15,6 @@ class FilePaths:
     """Filenames and paths to data."""
     fn_char_list = '../model/charList.txt'
     fn_summary = '../model/summary.json'
-    fn_corpus = '../data/corpus.txt'
 
 
 def get_img_height() -> int:
@@ -49,7 +48,7 @@ def train(model: Model,
     epoch = 0  # number of training epochs since start
     summary_char_error_rates = []
     summary_word_accuracies = []
-    preprocessor = Preprocessor(get_img_size(line_mode), data_augmentation=True, line_mode=line_mode)
+    preprocessor = Preprocessor(get_img_size(line_mode), data_augmentation=False, line_mode=line_mode)
     best_char_error_rate = float('inf')  # best validation character error rate
     no_improvement_since = 0  # number of epochs no improvement of character error rate occurred
     # stop training after this number of epochs without improvement
@@ -109,15 +108,21 @@ def validate(model: Model, loader: DataLoaderIAM, line_mode: bool) -> Tuple[floa
 
         print('Ground truth -> Recognized')
         for i in range(len(recognized)):
-            num_word_ok += 1 if batch.gt_texts[i] == recognized[i] else 0
-            num_word_total += 1
-            dist = editdistance.eval(recognized[i], batch.gt_texts[i])
-            num_char_err += dist
-            num_char_total += len(batch.gt_texts[i])
-            print('[OK]' if dist == 0 else '[ERR:%d]' % dist, '"' + batch.gt_texts[i] + '"', '->',
+            gt_split = batch.gt_texts[i][0].split()
+            rec_split = recognized[i][0].split()
+            dist_sentence = 0
+            for j in range(len(rec_split)):
+                num_word_ok += 1 if gt_split[j] == rec_split[j] else 0
+                num_word_total += 1
+                dist = editdistance.eval(rec_split[j], gt_split[j])
+                dist_sentence += dist
+                num_char_err += dist
+                num_char_total += len(batch.gt_texts[i])
+            print('[OK]' if dist == 0 else '[ERR:%d]' % dist_sentence, batch.gt_texts[i], '->',
                   '"' + recognized[i] + '"')
 
     # print validation result
+    print(num_char_err, num_char_total)
     char_error_rate = num_char_err / num_char_total
     word_accuracy = num_word_ok / num_word_total
     print(f'Character error rate: {char_error_rate * 100.0}%. Word accuracy: {word_accuracy * 100.0}%.')
@@ -126,16 +131,25 @@ def validate(model: Model, loader: DataLoaderIAM, line_mode: bool) -> Tuple[floa
 
 def infer(model: Model, fn_img: Path) -> None:
     """Recognizes text in image provided by file path."""
-    img = cv2.imread(fn_img, cv2.IMREAD_GRAYSCALE)
-    assert img is not None
+    
+    print("Image processing start")
+    for file in glob.glob("C:/Users/andre/Desktop/hwrt3/IAM-data/IAM-data/img/*.png"):
+        basename = os.path.basename(file)
+        # print(basename)
+        im = Image.open(file)
+        im = np.asarray(im)
+        preprocessor = Preprocessor(get_img_size(), dynamic_width=True, padding=16)
+        img = preprocessor.process_img(im)
+        batch = Batch([img], None, 1)
+        recognized, probability = model.infer_batch(batch, True)
+        with open('results.txt', 'w') as f:
+            f.write(basename + '\n')
+            f.write(recognized[0] + '\n' + '\n')
+    image_list = np.array(image_list).tolist()
 
     preprocessor = Preprocessor(get_img_size(), dynamic_width=True, padding=16)
     img = preprocessor.process_img(img)
 
-    batch = Batch([img], None, 1)
-    recognized, probability = model.infer_batch(batch, True)
-    print(f'Recognized: "{recognized[0]}"')
-    print(f'Probability: {probability[0]}')
 
 
 def parse_args() -> argparse.Namespace:
@@ -143,8 +157,8 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
 
     parser.add_argument('--mode', choices=['train', 'validate', 'infer'], default='infer')
-    parser.add_argument('--decoder', choices=['bestpath', 'beamsearch', 'wordbeamsearch'], default='bestpath')
-    parser.add_argument('--batch_size', help='Batch size.', type=int, default=100)
+    parser.add_argument('--decoder', choices=['bestpath', 'beamsearch'], default='beamsearch')
+    parser.add_argument('--batch_size', help='Batch size.', type=int, default=10) #default=100
     parser.add_argument('--data_dir', help='Directory containing IAM dataset.', type=Path, required=False)
     parser.add_argument('--fast', help='Load samples from LMDB.', action='store_true')
     parser.add_argument('--line_mode', help='Train to read text lines instead of single words.', action='store_true')
@@ -161,13 +175,12 @@ def main():
     # parse arguments and set CTC decoder
     args = parse_args()
     decoder_mapping = {'bestpath': DecoderType.BestPath,
-                       'beamsearch': DecoderType.BeamSearch,
-                       'wordbeamsearch': DecoderType.WordBeamSearch}
+                       'beamsearch': DecoderType.BeamSearch}
     decoder_type = decoder_mapping[args.decoder]
 
     # train the model
     if args.mode == 'train':
-        loader = DataLoaderIAM(args.data_dir, args.batch_size, fast=args.fast)
+        loader = DataLoaderIAM(args.data_dir, args.batch_size)
 
         # when in line mode, take care to have a whitespace in the char list
         char_list = loader.char_list
@@ -177,9 +190,6 @@ def main():
         # save characters and words
         with open(FilePaths.fn_char_list, 'w') as f:
             f.write(''.join(char_list))
-
-        with open(FilePaths.fn_corpus, 'w') as f:
-            f.write(' '.join(loader.train_words + loader.validation_words))
 
         model = Model(char_list, decoder_type)
         train(model, loader, line_mode=args.line_mode, early_stopping=args.early_stopping)

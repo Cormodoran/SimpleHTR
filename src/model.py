@@ -15,7 +15,6 @@ class DecoderType:
     """CTC decoder types."""
     BestPath = 0
     BeamSearch = 1
-    WordBeamSearch = 2
 
 
 class Model:
@@ -116,7 +115,8 @@ class Model:
         self.loss = tf.reduce_mean(
             input_tensor=tf.compat.v1.nn.ctc_loss(labels=self.gt_texts, inputs=self.ctc_in_3d_tbc,
                                                   sequence_length=self.seq_len,
-                                                  ctc_merge_repeated=True))
+                                                  ctc_merge_repeated=True,
+                                                  ignore_longer_outputs_than_inputs=True))
 
         # calc loss for each element to compute label probability
         self.saved_ctc_input = tf.compat.v1.placeholder(tf.float32,
@@ -130,20 +130,6 @@ class Model:
         elif self.decoder_type == DecoderType.BeamSearch:
             self.decoder = tf.nn.ctc_beam_search_decoder(inputs=self.ctc_in_3d_tbc, sequence_length=self.seq_len,
                                                          beam_width=50)
-        # word beam search decoding (see https://github.com/githubharald/CTCWordBeamSearch)
-        elif self.decoder_type == DecoderType.WordBeamSearch:
-            # prepare information about language (dictionary, characters in dataset, characters forming words)
-            chars = ''.join(self.char_list)
-            word_chars = open('../model/wordCharList.txt').read().splitlines()[0]
-            corpus = open('../data/corpus.txt').read()
-
-            # decode using the "Words" mode of word beam search
-            from word_beam_search import WordBeamSearch
-            self.decoder = WordBeamSearch(50, 'Words', 0.0, corpus.encode('utf8'), chars.encode('utf8'),
-                                          word_chars.encode('utf8'))
-
-            # the input to the decoder must have softmax already applied
-            self.wbs_input = tf.nn.softmax(self.ctc_in_3d_tbc, axis=2)
 
     def setup_tf(self) -> Tuple[tf.compat.v1.Session, tf.compat.v1.train.Saver]:
         """Initialize TF."""
@@ -170,7 +156,7 @@ class Model:
 
         return sess, saver
 
-    def to_sparse(self, texts: List[str]) -> Tuple[List[List[int]], List[int], List[int]]:
+    def to_sparse(self, texts: str) -> Tuple[List[List[int]], List[int], List[int]]:
         """Put ground truth texts into sparse tensor for ctc_loss."""
         indices = []
         values = []
@@ -179,7 +165,7 @@ class Model:
         # go over all texts
         for batchElement, text in enumerate(texts):
             # convert to string of label (i.e. class-ids)
-            label_str = [self.char_list.index(c) for c in text]
+            label_str = [self.char_list.index(cc) for c in text for cc in c ]
             # sparse tensor must have size of max. label-string
             if len(label_str) > shape[1]:
                 shape[1] = len(label_str)
@@ -193,23 +179,18 @@ class Model:
     def decoder_output_to_text(self, ctc_output: tuple, batch_size: int) -> List[str]:
         """Extract texts from output of CTC decoder."""
 
-        # word beam search: already contains label strings
-        if self.decoder_type == DecoderType.WordBeamSearch:
-            label_strs = ctc_output
-
         # TF decoders: label strings are contained in sparse tensor
-        else:
-            # ctc returns tuple, first element is SparseTensor
-            decoded = ctc_output[0][0]
+        # ctc returns tuple, first element is SparseTensor
+        decoded = ctc_output[0][0]
 
-            # contains string of labels for each batch element
-            label_strs = [[] for _ in range(batch_size)]
+        # contains string of labels for each batch element
+        label_strs = [[] for _ in range(batch_size)]
 
-            # go over all indices and save mapping: batch -> values
-            for (idx, idx2d) in enumerate(decoded.indices):
-                label = decoded.values[idx]
-                batch_element = idx2d[0]  # index according to [b,t]
-                label_strs[batch_element].append(label)
+        # go over all indices and save mapping: batch -> values
+        for (idx, idx2d) in enumerate(decoded.indices):
+            label = decoded.values[idx]
+            batch_element = idx2d[0]  # index according to [b,t]
+            label_strs[batch_element].append(label)
 
         # map labels to chars for all batch elements
         return [''.join([self.char_list[c] for c in labelStr]) for labelStr in label_strs]
@@ -254,11 +235,7 @@ class Model:
 
         # put tensors to be evaluated into list
         eval_list = []
-
-        if self.decoder_type == DecoderType.WordBeamSearch:
-            eval_list.append(self.wbs_input)
-        else:
-            eval_list.append(self.decoder)
+        eval_list.append(self.decoder)
 
         if self.dump or calc_probability:
             eval_list.append(self.ctc_in_3d_tbc)
@@ -274,11 +251,7 @@ class Model:
         eval_res = self.sess.run(eval_list, feed_dict)
 
         # TF decoders: decoding already done in TF graph
-        if self.decoder_type != DecoderType.WordBeamSearch:
-            decoded = eval_res[0]
-        # word beam search decoder: decoding is done in C++ function compute()
-        else:
-            decoded = self.decoder.compute(eval_res[0])
+        decoded = eval_res[0]
 
         # map labels (numbers) to character string
         texts = self.decoder_output_to_text(decoded, num_batch_elements)
