@@ -2,9 +2,9 @@ import argparse
 import glob
 import json
 import os
+import pathlib
 from typing import List, Tuple
 
-import cv2
 import editdistance
 import numpy as np
 from path import Path
@@ -145,8 +145,9 @@ def infer(model: Model, fn_img: Path) -> None:
         preprocessor = Preprocessor(get_img_size(), dynamic_width=True, padding=16)
         img = preprocessor.process_img(im)
         batch = Batch([img], None, 1)
-        recognized, probability = model.infer_batch(batch, True)
-        with open('results.txt', 'w') as f:
+        recognized, _ = model.infer_batch(batch, True)
+
+        with open("../result.txt", 'a') as f:
             f.write(basename + '\n')
             f.write(recognized[0] + '\n' + '\n')
 
@@ -205,7 +206,7 @@ def main():
     # infer text on test image
     elif args.mode == 'infer':
         model = Model(char_list_from_file(), decoder_type, must_restore=True, dump=args.dump)
-        infer(model, args.img_file)
+        infer(model, args.data_dir)
 
 
 if __name__ == '__main__':

@@ -8,11 +8,13 @@
             "name": "Python: Aktuelle Datei",
             "type": "python",
             "request": "launch",
-            "program": "src\\main.py",
+            "program": "src/main.py",
             "console": "integratedTerminal",
             "justMyCode": true,
-            "env": {"PYTHONPATH": "src"},
-            "args": ["--mode", "train", "--data_dir", "C:\\Users\\andre\\Dead-Sea-Scrolls", "--line_mode"]
+            "args": [
+                "--data_dir",
+                "data/IAM-data/img/",
+            ]
         }
     ]
 }
