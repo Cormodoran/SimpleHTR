@@ -1,15 +1,17 @@
 import argparse
-import json
-from typing import Tuple, List
 import glob
-import cv2
-import numpy as np
-import editdistance
-from path import Path
+import json
 import os
+from typing import List, Tuple
 
-from dataloader_iam import DataLoaderIAM, Batch
-from model import Model, DecoderType
+import cv2
+import editdistance
+import numpy as np
+from path import Path
+from PIL import Image
+
+from dataloader_iam import Batch, DataLoaderIAM
+from model import DecoderType, Model
 from preprocessor import Preprocessor
 
 
@@ -154,6 +156,7 @@ def parse_args() -> argparse.Namespace:
     """Parses arguments from the command line."""
     parser = argparse.ArgumentParser()
 
+    parser.add_argument('--input-dir', help="input directory", default="input")
     parser.add_argument('--mode', choices=['train', 'validate', 'infer'], default='infer')
     parser.add_argument('--decoder', choices=['bestpath', 'beamsearch'], default='beamsearch')
     parser.add_argument('--batch_size', help='Batch size.', type=int, default=10) #default=100
