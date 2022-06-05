@@ -1,8 +1,9 @@
 import argparse
 import json
 from typing import Tuple, List
-
+import glob
 import cv2
+import numpy as np
 import editdistance
 from path import Path
 
@@ -178,6 +179,7 @@ def main():
                        'beamsearch': DecoderType.BeamSearch}
     decoder_type = decoder_mapping[args.decoder]
 
+    args.line_mode = True
     # train the model
     if args.mode == 'train':
         loader = DataLoaderIAM(args.data_dir, args.batch_size)
