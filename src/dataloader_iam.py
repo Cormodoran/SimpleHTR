@@ -21,7 +21,7 @@ class DataLoaderIAM:
     def __init__(self,
                  data_dir: Path,
                  batch_size: int,
-                 data_split: float = 0.8) -> None:
+                 data_split: float = 0.99) -> None:
         """Loader for dataset."""
 
         assert data_dir.exists()
