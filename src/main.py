@@ -62,13 +62,17 @@ def train(model: Model,
 
         # train
         print('Train NN')
-        loader.train_set()
-        while loader.has_next():
-            iter_info = loader.get_iterator_info()
-            batch = loader.get_next()
-            batch = preprocessor.process_batch(batch)
-            loss = model.train_batch(batch)
-            print(f'Epoch: {epoch} Batch: {iter_info[0]}/{iter_info[1]} Loss: {loss}')
+        for loop in range(8):
+            loader.load_batch(loop)
+            print("pickle loaded")
+            loader.train_set()
+            while loader.has_next():
+                iter_info = loader.get_iterator_info()
+                batch = loader.get_next()
+                batch = preprocessor.process_batch(batch)
+                loss = model.train_batch(batch)
+                print(f'Epoch: {epoch} Pickle: {loop} Batch: {iter_info[0]}/{iter_info[1]} Loss: {loss}')
+            
 
         # validate
         char_error_rate, word_accuracy = validate(model, loader, line_mode)
@@ -118,10 +122,10 @@ def validate(model: Model, loader: DataLoaderIAM, line_mode: bool) -> Tuple[floa
             for j in range(len(rec_split)):
                 num_word_ok += 1 if gt_split[j] == rec_split[j] else 0
                 num_word_total += 1
-                dist = editdistance.eval(rec_split[j], gt_split[j])
-                dist_sentence += dist
-                num_char_err += dist
-                num_char_total += len(batch.gt_texts[i])
+            dist = editdistance.eval(recognized[i], batch.gt_texts[i])
+            dist_sentence += dist
+            num_char_err += dist
+            num_char_total += len(batch.gt_texts[i])
             print('[OK]' if dist == 0 else '[ERR:%d]' % dist_sentence, batch.gt_texts[i], '->',
                   '"' + recognized[i] + '"')
 
@@ -160,7 +164,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument('--input-dir', help="input directory", default="input")
     parser.add_argument('--mode', choices=['train', 'validate', 'infer'], default='infer')
     parser.add_argument('--decoder', choices=['bestpath', 'beamsearch'], default='beamsearch')
-    parser.add_argument('--batch_size', help='Batch size.', type=int, default=10) #default=100
+    parser.add_argument('--batch_size', help='Batch size.', type=int, default=200) #default=100
     parser.add_argument('--data_dir', help='Directory containing IAM dataset.', type=Path, required=False)
     parser.add_argument('--fast', help='Load samples from LMDB.', action='store_true')
     parser.add_argument('--line_mode', help='Train to read text lines instead of single words.', action='store_true')

@@ -25,11 +25,13 @@ class DataLoaderIAM:
         """Loader for dataset."""
 
         assert data_dir.exists()
+        self.data_dir = data_dir
 
         self.data_augmentation = False
         self.curr_idx = 0
         self.batch_size = batch_size
         self.samples = []
+        self.pickle_batch = 0
 
         sentences_to_read = open(data_dir / "sentences.pickle", "rb")
         self.sentences = pickle.load(sentences_to_read)
@@ -43,8 +45,6 @@ class DataLoaderIAM:
         flat_list = ''.join(flat_list)
         chars = set(flat_list)
 
-        for i in range(len(self.sentences)):
-            self.samples.append(Sample(self.images[i], self.sentences[i]))
 
 
         # split into training and validation set: 95% - 5%
@@ -58,6 +58,28 @@ class DataLoaderIAM:
 
         # list of all chars in dataset
         self.char_list = sorted(list(chars))
+
+    def load_batch(self, pickle_batch) -> None:
+        self.samples = []
+        sentences_to_read = open(self.data_dir / str(pickle_batch) + "sentencesc.pickle", "rb")
+        self.sentences = pickle.load(sentences_to_read)
+        sentences_to_read.close()
+
+        images_to_read = open(self.data_dir / str(pickle_batch) + "imagesc.pickle", "rb")
+        self.images = pickle.load(images_to_read)
+        images_to_read.close()
+
+        for i in range(len(self.sentences)):
+            self.samples.append(Sample(self.images[i], self.sentences[i]))
+        split = 1
+        if pickle_batch == 7:
+            split = 0.9972 #0.9972
+        split_idx = int(split * len(self.samples))-1
+        if pickle_batch == 7:
+            split_idx += 5
+        self.train_samples = self.samples[:split_idx]
+        self.validation_samples = self.samples[split_idx:]
+
 
     def train_set(self) -> None:
         """Switch to randomly chosen subset of training set."""
@@ -86,7 +108,8 @@ class DataLoaderIAM:
         """Is there a next element?"""
         if self.curr_set == 'train':
             print(self.curr_idx, self.batch_size, len(self.samples))
-            return self.curr_idx + self.batch_size <= len(self.samples)  # train set: only full-sized batches
+        if self.curr_idx + self.batch_size <= len(self.samples):
+            return self.curr_idx + self.batch_size <= len(self.samples) # train set: only full-sized batches
         else:
             return self.curr_idx < len(self.samples)  # val set: allow last batch to be smaller
 
